@@ -3,6 +3,8 @@ from typing import Tuple
 import odf.opendocument
 import odf.table
 import odf.style
+import os
+import re
 import requests
 
 
@@ -228,13 +230,14 @@ class ODTParser:
 
 
 class DataGatherer:
-    '''Class to collect data that is relevant to the application'''
+    '''Class to collect data that is relevant to the application.
+    Returns data in JSON'''
 
     def __init__(self):
         self.json = DataEncoder()
 
     def get_class_list(self) -> str:
-        '''Gets the list of classes grouped by form. Returns a JSON string'''
+        '''Gets the list of classes grouped by form'''
 
         url = 'http://lyceum.urfu.ru/study/mobile.php?f=4'
         resp = requests.get(url)
@@ -254,7 +257,7 @@ class DataGatherer:
         return self.json.encode(classes)
 
     def get_study_plan(self) -> str:
-        '''Gets the study plan. Returns a JSON string'''
+        '''Gets the study plan'''
         url = 'http://lyceum.urfu.ru/study/calgraf.odt'
         filename = 'calgraf.odt'
         resp = requests.get(url)
@@ -266,4 +269,38 @@ class DataGatherer:
 
         plan = ODTParser(filename).parse()
 
+        os.remove(filename)
+
         return self.json.encode(plan)
+
+    def get_rings_timetable(self) -> str:
+        '''Gets the rings timetable and computes the breaks' length'''
+        ptn = re.compile('<td>[1-7] урок</td>' +
+                         '(?:<td>(?:&nbsp;)?([0-9]{1,2}):([0-9]{2})</td>)' * 2)
+
+        url = 'http://lyceum.urfu.ru/study/?id=0'
+        resp = requests.get(url)
+        if resp.status_code != 200:
+            return None
+
+        lessons = ptn.findall(resp.text)
+        table = []
+        for idx, elem in enumerate(lessons):
+            sh, sm, eh, em = elem
+            table.append({'type': 'lesson',
+                          'start': sh + ':' + sm,
+                          'end': eh + ':' + em})
+            try:
+                break_len = int(lessons[idx + 1][1]) - int(em)
+                if break_len < 0:
+                    break_len += 60
+                table.append({'type': 'break',
+                              'len': break_len})
+            except IndexError:
+                pass
+
+        return self.json.encode(table)
+
+print(DataGatherer().get_rings_timetable())
+
+
