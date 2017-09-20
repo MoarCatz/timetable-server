@@ -1,8 +1,9 @@
-from json import JSONEncoder
 from typing import Tuple
+from urllib.parse import urlencode
 import odf.opendocument
 import odf.table
 import odf.style
+import json
 import os
 import re
 import requests
@@ -49,7 +50,7 @@ class Calendar:
         self.months[month][0] = pad
 
 
-class DataEncoder(JSONEncoder):
+class DataEncoder(json.JSONEncoder):
     '''Subclass to serialize Calendar objects to JSON. Also eliminates
     whitespace in the resulting JSON'''
 
@@ -236,10 +237,16 @@ class DataGatherer:
     def __init__(self):
         self.json = DataEncoder()
 
+    def api_url(self, **kwargs) -> str:
+        '''Returns a properly formed and encoded URL for the SESC API'''
+        api_base = 'http://lyceum.urfu.ru/study/mobile.php?'
+        return api_base + urlencode(kwargs, encoding='cp1251')
+
+
     def get_class_list(self) -> str:
         '''Gets the list of classes grouped by form'''
 
-        url = 'http://lyceum.urfu.ru/study/mobile.php?f=4'
+        url = self.api_url(f=4)
         resp = requests.get(url)
         if resp.status_code != 200:
             return None
@@ -301,6 +308,38 @@ class DataGatherer:
 
         return self.json.encode(table)
 
-print(DataGatherer().get_rings_timetable())
+    def get_perm_timetable(self, cls: str) -> list:
+        '''Returns the permanent timetable for a given class as a list'''
+        timetable = [[] for i in range(6)]
 
+        url = self.api_url(f=1, k=cls.lower())
+        resp = requests.get(url)
+        if resp.status_code != 200:
+            return None
 
+        week = json.loads(resp.text)[cls.lower()]['Timetable']
+
+        for idx, day in enumerate(week):
+            lessons = day['Lessons']
+            for lesson in lessons:
+                form_lsns = []
+                for group in lesson['LessonsByGroups']:
+                    form_lsns.append({'name': group['Subject'],
+                                      'teacher': group['Teacher'],
+                                      'room': group['Classroom']})
+
+                timetable[idx].append(form_lsns)
+
+        return timetable
+
+    def get_full_perm_timetable(self):
+        '''Returns the permanent timetable for all classes'''
+        url = self.api_url(f=4)
+        resp = requests.get(url)
+        if resp.status_code != 200:
+            return None
+
+        cls_list = resp.text.upper().splitlines()
+        full_tmtb = {cls: self.get_perm_timetable(cls) for cls in cls_list}
+
+        return self.json.encode(full_tmtb)
