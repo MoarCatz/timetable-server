@@ -1,11 +1,11 @@
 from typing import Tuple
-from urllib.parse import urlencode
-import odf.opendocument
-import odf.table
-import odf.style
+from urllib.parse import urlencode, quote_plus
 import json
 import os
 import re
+import odf.opendocument
+import odf.table
+import odf.style
 import requests
 
 
@@ -235,7 +235,7 @@ class DataGatherer:
     Returns data in JSON'''
 
     def __init__(self):
-        self.json = DataEncoder()
+        self.json = DataEncoder(ensure_ascii=False)
 
     def api_url(self, **kwargs) -> str:
         '''Returns a properly formed and encoded URL for the SESC API'''
@@ -243,8 +243,9 @@ class DataGatherer:
         return api_base + urlencode(kwargs, encoding='cp1251')
 
 
-    def get_class_list(self) -> str:
-        '''Gets the list of classes grouped by form'''
+    def get_class_list(self, return_json=True) -> str:
+        '''Gets the list of classes grouped by form
+        If `json` is False, returns a list of classes without grouping'''
 
         url = self.api_url(f=4)
         resp = requests.get(url)
@@ -252,6 +253,9 @@ class DataGatherer:
             return None
 
         cls_list = resp.text.upper().splitlines()
+
+        if not return_json:
+            return cls_list
 
         classes = {'8': [],
                    '9': [],
@@ -271,8 +275,8 @@ class DataGatherer:
         if resp.status_code != 200:
             return None
 
-        with open(filename, 'wb') as f:
-            f.write(resp.content)
+        with open(filename, 'wb') as file:
+            file.write(resp.content)
 
         plan = ODTParser(filename).parse()
 
@@ -334,12 +338,94 @@ class DataGatherer:
 
     def get_full_perm_timetable(self):
         '''Returns the permanent timetable for all classes'''
-        url = self.api_url(f=4)
+        cls_list = self.get_class_list(return_json=False)
+
+        full_tmtb = {cls: self.get_perm_timetable(cls) for cls in cls_list}
+
+        return self.json.encode(full_tmtb)
+
+    def get_teacher_timetable(self, abbr_name: str) -> Tuple[list, list]:
+        '''Returns a timetable for a given teacher's abbreviated name and
+        a list of classes that have lessons with this teacher'''
+        week_days = ['Понедельник', 'Вторник', 'Среда', 'Четверг',
+                     'Пятница', 'Суббота']
+        url = self.api_url(f=2, p=abbr_name)
         resp = requests.get(url)
         if resp.status_code != 200:
             return None
 
-        cls_list = resp.text.upper().splitlines()
-        full_tmtb = {cls: self.get_perm_timetable(cls) for cls in cls_list}
+        try:
+            week = json.loads(resp.text)[abbr_name]['Timetable']
+        except json.decoder.JSONDecodeError:
+            return None, None
 
-        return self.json.encode(full_tmtb)
+        timetable = [None] * 6
+        classes = set()
+        for day in week:
+            day_number = week_days.index(day['Day'])
+            lessons = [None] * 7
+            for lsn in day['Lessons']:
+                lsn_obj = {}
+                lsn_number = int(lsn['Number']) - 1
+                cls = lsn['Class'].upper()
+                classes.add(cls)
+
+                lsn_obj['class'] = cls
+                lsn_obj['room'] = lsn['Classroom']
+                lsn_obj['name'] = lsn['Subject']
+
+                lessons[lsn_number] = lsn_obj
+
+            timetable[day_number] = lessons
+
+        return timetable, list(classes)
+
+    def get_teachers(self) -> str:
+        '''Returns full information about every teacher'''
+        info_url = 'http://lyceum.urfu.ru/offic/?id=6'
+        info_ptn = re.compile('<tr>'
+                              '<td>([^<]+?)</td>'  # Full name
+                              '<td>([^<]+?)</td>'  # Department
+                              '<td>([^<]+?)</td>'  # Job
+                              '<td class=\'c\'>')
+
+        url = self.api_url(f=7)
+        resp = requests.get(url)
+        if resp.status_code != 200:
+            return None
+
+        tch_list = resp.text.splitlines()
+        teachers = []
+        for full_name in tch_list:
+            tch_obj = {}
+            tch_obj['full'] = full_name
+
+            last, first, patr = full_name.split()
+            abbr_name = last + ' {}. {}.'.format(first[0], patr[0])
+            tch_obj['abbr'] = abbr_name
+
+            # Collect job and department
+            req_data = {'subStaff': '%C8%F1%EA%E0%F2%FC',
+                        'unitStaff': '0',
+                        'famStaff': quote_plus(last, encoding='cp1251')}
+            data_str = '&'.join(k + '=' + v for k, v in req_data.items())
+            headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+            resp = requests.post(info_url,
+                                 data=data_str,
+                                 headers=headers)
+
+            for match in info_ptn.findall(resp.text.replace('&nbsp;', ' ')):
+                if full_name == match[0]:
+                    tch_obj['dep'] = match[1]
+                    tch_obj['job'] = match[2]
+                    break
+
+            # Collect timetable
+            tmtbl, classes = self.get_teacher_timetable(abbr_name)
+            if tmtbl is not None:
+                tch_obj['timetable'] = tmtbl
+                tch_obj['classes'] = classes
+
+            teachers.append(tch_obj)
+
+        return self.json.encode(teachers)
