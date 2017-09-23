@@ -429,3 +429,37 @@ class DataGatherer:
             teachers.append(tch_obj)
 
         return self.json.encode(teachers)
+
+    def get_changes(self) -> str:
+        '''Returns the changes in the timetable'''
+        url = 'http://lyceum.urfu.ru/study/izmenHtml.php'
+
+        sect_ptn = re.compile('ИЗМЕНЕНИЯ В РАСПИСАНИИ НА '
+                              '([А-Я]+), ([0-9]+) ([А-Я]+)\\s*?'
+                              '</h1>(.+?)(?=(?:</body>|<h1>))', re.S)
+
+        class_chg_ptn = re.compile('<h2>([0-9]{1,2}[А-Яа-я])</h2>'
+                                   '(.+?)(?=(?:<h2>|$))', re.S)
+        chg_item_ptn = re.compile('<p>([^<]+?)</p>')
+
+
+        resp = requests.get(url)
+        if resp.status_code != 200:
+            return None
+
+        days = []
+        for wkday, day, month, content in sect_ptn.findall(resp.text):
+            chg_obj = {'wkday': wkday.capitalize(),
+                       'day': day,
+                       'month': month.lower()}
+
+            for cls, chg_content in class_chg_ptn.findall(content):
+                changes = []
+                for chg_item in chg_item_ptn.findall(chg_content):
+                    changes.append(chg_item.replace('&nbsp;&mdash;', ' –'))
+
+                chg_obj[cls.upper()] = changes
+
+            days.append(chg_obj)
+
+        return self.json.encode(days)
