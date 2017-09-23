@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Tuple
 from urllib.parse import urlencode, quote_plus
 import json
@@ -237,7 +238,8 @@ class DataGatherer:
     def __init__(self):
         self.json = DataEncoder(ensure_ascii=False)
 
-    def api_url(self, **kwargs) -> str:
+    @staticmethod
+    def api_url(**kwargs) -> str:
         '''Returns a properly formed and encoded URL for the SESC API'''
         api_base = 'http://lyceum.urfu.ru/study/mobile.php?'
         return api_base + urlencode(kwargs, encoding='cp1251')
@@ -321,7 +323,10 @@ class DataGatherer:
         if resp.status_code != 200:
             return None
 
-        week = json.loads(resp.text)[cls.lower()]['Timetable']
+        try:
+            week = json.loads(resp.text)[cls.lower()]['Timetable']
+        except json.decoder.JSONDecodeError:
+            return None
 
         for idx, day in enumerate(week):
             lessons = day['Lessons']
@@ -442,7 +447,6 @@ class DataGatherer:
                                    '(.+?)(?=(?:<h2>|$))', re.S)
         chg_item_ptn = re.compile('<p>([^<]+?)</p>')
 
-
         resp = requests.get(url)
         if resp.status_code != 200:
             return None
@@ -463,3 +467,39 @@ class DataGatherer:
             days.append(chg_obj)
 
         return self.json.encode(days)
+
+    def get_vacant_rooms(self, wkday: int = None) -> str:
+        '''Returns vacant rooms for every lesson grouped by floors'''
+        week_days = ['Понедельник', 'Вторник', 'Среда', 'Четверг',
+                     'Пятница', 'Суббота']
+        room_list_url = self.api_url(f=6)
+        resp = requests.get(room_list_url)
+        if resp.status_code != 200:
+            return None
+
+        room_list = {i for i in resp.text.splitlines() if i.isdigit()}
+
+        wkday_idx = wkday or datetime.now().isoweekday()
+        occ_rooms_url = self.api_url(f=3, d=wkday_idx)
+        resp = requests.get(occ_rooms_url)
+        if resp.status_code != 200:
+            return None
+
+        try:
+            lsns = json.loads(resp.text)[week_days[wkday_idx - 1]]['Timetable']
+        except json.decoder.JSONDecodeError:
+            return None
+
+        occ_rooms = []
+        for lesson in lsns:
+            occ_rooms.append({i['Classroom'] for i in lesson['Classrooms']})
+
+        vacant_rooms = []
+        for lesson_rooms in occ_rooms:
+            grouped = {'1': [], '2': [], '3': []}
+            for i in room_list.difference(lesson_rooms):
+                grouped[i[0]].append(i)
+
+            vacant_rooms.append(grouped)
+
+        return self.json.encode(vacant_rooms)
