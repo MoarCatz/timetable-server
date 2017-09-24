@@ -503,3 +503,38 @@ class DataGatherer:
             vacant_rooms.append(grouped)
 
         return self.json.encode(vacant_rooms)
+
+    def get_class_teachers(self) -> str:
+        '''Returns teachers for each class with their subject'''
+        full_name_url = self.api_url(f=7)
+        resp = requests.get(full_name_url)
+        if resp.status_code != 200:
+            return None
+
+        name_map = {}
+        for full_name in resp.text.splitlines():
+            last, first, patr = full_name.split()
+            name_map[last + ' {}. {}.'.format(first[0], patr[0])] = full_name
+
+        class_teachers = {}
+        for cls in self.get_class_list(return_json=False):
+            teachers = []
+            used_subjects = set()
+            tmtbl = self.get_perm_timetable(cls)
+
+            for day in tmtbl:
+                for lesson in day:
+                    for group in lesson:
+                        subj = group['name']
+                        if subj in used_subjects:
+                            continue
+
+                        tchr = group['teacher']
+                        if tchr is not None:
+                            teachers.append({'teacher': name_map[tchr],
+                                             'subject': subj})
+                        used_subjects.add(subj)
+
+            class_teachers[cls] = teachers
+
+        return self.json.encode(class_teachers)
