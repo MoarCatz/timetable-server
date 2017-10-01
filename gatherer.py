@@ -272,7 +272,7 @@ class DataGatherer:
     def get_study_plan(self) -> str:
         '''Gets the study plan'''
         url = 'http://lyceum.urfu.ru/study/calgraf.odt'
-        filename = 'calgraf.odt'
+        filename = 'study_plan.odt'
         resp = requests.get(url)
         if resp.status_code != 200:
             return None
@@ -381,7 +381,8 @@ class DataGatherer:
 
                 lessons[lsn_number] = lsn_obj
 
-            timetable[day_number] = lessons
+            if any(lessons):
+                timetable[day_number] = lessons
 
         return timetable, list(classes)
 
@@ -410,7 +411,7 @@ class DataGatherer:
             tch_obj['abbr'] = abbr_name
 
             # Collect job and department
-            req_data = {'subStaff': '%C8%F1%EA%E0%F2%FC',
+            req_data = {'subStaff': '%C8%F1%EA%E0%F2%FC',  # "Искать"
                         'unitStaff': '0',
                         'famStaff': quote_plus(last, encoding='cp1251')}
             data_str = '&'.join(k + '=' + v for k, v in req_data.items())
@@ -437,6 +438,12 @@ class DataGatherer:
 
     def get_changes(self) -> str:
         '''Returns the changes in the timetable'''
+        wkday_map = {'ПОНЕДЕЛЬНИК': 'Понедельник',
+                     'ВТОРНИК': 'Вторник',
+                     'СРЕДУ': 'Среда',
+                     'ЧЕТВЕРГ': 'Четверг',
+                     'ПЯТНИЦУ': 'Пятница',
+                     'СУББОТУ': 'Суббота'}
         url = 'http://lyceum.urfu.ru/study/izmenHtml.php'
 
         sect_ptn = re.compile('ИЗМЕНЕНИЯ В РАСПИСАНИИ НА '
@@ -453,7 +460,7 @@ class DataGatherer:
 
         days = []
         for wkday, day, month, content in sect_ptn.findall(resp.text):
-            chg_obj = {'wkday': wkday.capitalize(),
+            chg_obj = {'wkday': wkday_map[wkday],
                        'day': day,
                        'month': month.lower()}
 
@@ -505,22 +512,15 @@ class DataGatherer:
         return self.json.encode(vacant_rooms)
 
     def get_class_teachers(self) -> str:
-        '''Returns teachers for each class with their subject'''
-        full_name_url = self.api_url(f=7)
-        resp = requests.get(full_name_url)
-        if resp.status_code != 200:
-            return None
-
-        name_map = {}
-        for full_name in resp.text.splitlines():
-            last, first, patr = full_name.split()
-            name_map[last + ' {}. {}.'.format(first[0], patr[0])] = full_name
-
+        '''Returns teachers' abbreviated names for each class
+        with their subject'''
         class_teachers = {}
         for cls in self.get_class_list(return_json=False):
             teachers = []
             used_subjects = set()
             tmtbl = self.get_perm_timetable(cls)
+            if tmtbl is None:
+                continue
 
             for day in tmtbl:
                 for lesson in day:
@@ -531,7 +531,7 @@ class DataGatherer:
 
                         tchr = group['teacher']
                         if tchr is not None:
-                            teachers.append({'teacher': name_map[tchr],
+                            teachers.append({'teacher': tchr,
                                              'subject': subj})
                         used_subjects.add(subj)
 
