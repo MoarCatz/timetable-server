@@ -1,0 +1,23 @@
+language: python
+
+python:
+  - "3.5"
+
+install:
+  - pip install codecov coverage httmock requests odfpy
+
+script:
+  - python3 test_gatherer.py
+  - coverage run test_gatherer.py
+
+after_success:
+  - codecov
+
+notifications:
+  email: false
+
+  slack:
+    rooms:
+      - owllit:GRN6KTTcUiujsRDPbBROMEr0
+    on_success: never
+    on_failure: always
