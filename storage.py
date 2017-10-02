@@ -11,7 +11,7 @@ class Storage:
                                    user=user,
                                    password=password)
         c = self.db.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS storage (key text,
+        c.execute('''CREATE TABLE IF NOT EXISTS storage (key text PRIMARY KEY,
                                                          value text)''')
         self.db.commit()
         c.close()
@@ -20,15 +20,22 @@ class Storage:
         '''Returns a value by key given as a string'''
         c = self.db.cursor()
         c.execute('''SELECT FROM storage WHERE key = %s''', (key,))
-        value = c.fetchone()[0]
+        try:
+            value = c.fetchone()[0]
+        except IndexError:
+            raise KeyError('no value with this key: {}'.format(key))
         c.close()
         return value
 
     def set(self, key: str, value: str):
         '''Sets the given key to the given value'''
         c = self.db.cursor()
-        c.execute('''UPDATE storage SET value = %s
-                     WHERE key = %s''', (key, value))
+        c.execute('''SELECT FROM storage WHERE key = %s''', (key,))
+        if c.fetchone() is None:
+            c.execute('''INSERT INTO storage VALUES (%s, %s)''', (key, value))
+        else:
+            c.execute('''UPDATE storage SET value = %s
+                         WHERE key = %s''', (key, value))
         self.db.commit()
         c.close()
 

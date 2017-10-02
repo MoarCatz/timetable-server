@@ -521,3 +521,5 @@ class DataGatherer:
             class_teachers[cls] = teachers
 
         return class_teachers
+
+print(DataGatherer().get_study_plan())
