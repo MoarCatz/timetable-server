@@ -28,6 +28,8 @@ class Day:
 
 class Calendar:
     '''Calendar object. Contains Day objects ordered by month'''
+    months_order = ['Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+                    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь']
 
     def __init__(self):
         self.months = {}
@@ -50,26 +52,12 @@ class Calendar:
         until the start of the month'''
         self.months[month][0] = pad
 
-
-class DataEncoder(json.JSONEncoder):
-    '''Subclass to serialize Calendar objects to JSON. Also eliminates
-    whitespace in the resulting JSON'''
-
-    months_order = ['Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
-                    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь']
-
-    def __init__(self, **kwargs):
-        kwargs['separators'] = (',', ':')
-        super().__init__(**kwargs)
-
-    def default(self, o):
-        if not isinstance(o, Calendar):
-            return super().default(o)
-
+    def to_list(self) -> list:
+        '''Returns a list of months, suitable for JSON serialization'''
         cld = []
         for month in self.months_order:
-            month_arr = [None] * o.months[month][0]
-            for day in o.months[month][1:]:
+            month_arr = [None] * self.months[month][0]
+            for day in self.months[month][1:]:
                 if day is None:
                     break
                 day_obj = {'type': day.day_type,
@@ -232,11 +220,7 @@ class ODTParser:
 
 
 class DataGatherer:
-    '''Class to collect data that is relevant to the application.
-    Returns data in JSON'''
-
-    def __init__(self):
-        self.json = DataEncoder(ensure_ascii=False)
+    '''Class to collect data that is relevant to the application'''
 
     @staticmethod
     def api_url(**kwargs) -> str:
@@ -244,10 +228,9 @@ class DataGatherer:
         api_base = 'http://lyceum.urfu.ru/study/mobile.php?'
         return api_base + urlencode(kwargs, encoding='cp1251')
 
-
-    def get_class_list(self, return_json=True) -> str:
+    def get_class_list(self, group=True) -> dict:
         '''Gets the list of classes grouped by form
-        If `json` is False, returns a list of classes without grouping'''
+        If `group` is False, returns a list of classes without grouping'''
 
         url = self.api_url(f=4)
         resp = requests.get(url)
@@ -256,7 +239,7 @@ class DataGatherer:
 
         cls_list = resp.text.upper().splitlines()
 
-        if not return_json:
+        if not group:
             return cls_list
 
         classes = {'8': [],
@@ -267,9 +250,9 @@ class DataGatherer:
         for i in cls_list:
             classes[i[:-1]].append(i)
 
-        return self.json.encode(classes)
+        return classes
 
-    def get_study_plan(self) -> str:
+    def get_study_plan(self) -> list:
         '''Gets the study plan'''
         url = 'http://lyceum.urfu.ru/study/calgraf.odt'
         filename = 'study_plan.odt'
@@ -284,9 +267,9 @@ class DataGatherer:
 
         os.remove(filename)
 
-        return self.json.encode(plan)
+        return plan.to_list()
 
-    def get_rings_timetable(self) -> str:
+    def get_rings_timetable(self) -> list:
         '''Gets the rings timetable and computes the breaks' length'''
         ptn = re.compile('<td>[1-7] урок</td>' +
                          '(?:<td>(?:&nbsp;)?([0-9]{1,2}):([0-9]{2})</td>)' * 2)
@@ -312,7 +295,7 @@ class DataGatherer:
             except IndexError:
                 pass
 
-        return self.json.encode(table)
+        return table
 
     def get_perm_timetable(self, cls: str) -> list:
         '''Returns the permanent timetable for a given class as a list'''
@@ -341,13 +324,13 @@ class DataGatherer:
 
         return timetable
 
-    def get_full_perm_timetable(self):
+    def get_full_perm_timetable(self) -> dict:
         '''Returns the permanent timetable for all classes'''
-        cls_list = self.get_class_list(return_json=False)
+        cls_list = self.get_class_list(group=False)
 
         full_tmtb = {cls: self.get_perm_timetable(cls) for cls in cls_list}
 
-        return self.json.encode(full_tmtb)
+        return full_tmtb
 
     def get_teacher_timetable(self, abbr_name: str) -> Tuple[list, list]:
         '''Returns a timetable for a given teacher's abbreviated name and
@@ -386,7 +369,7 @@ class DataGatherer:
 
         return timetable, list(classes)
 
-    def get_teachers(self) -> str:
+    def get_teachers(self) -> list:
         '''Returns full information about every teacher'''
         info_url = 'http://lyceum.urfu.ru/offic/?id=6'
         info_ptn = re.compile('<tr>'
@@ -434,9 +417,9 @@ class DataGatherer:
 
             teachers.append(tch_obj)
 
-        return self.json.encode(teachers)
+        return teachers
 
-    def get_changes(self) -> str:
+    def get_changes(self) -> list:
         '''Returns the changes in the timetable'''
         wkday_map = {'ПОНЕДЕЛЬНИК': 'Понедельник',
                      'ВТОРНИК': 'Вторник',
@@ -473,9 +456,9 @@ class DataGatherer:
 
             days.append(chg_obj)
 
-        return self.json.encode(days)
+        return days
 
-    def get_vacant_rooms(self, wkday: int = None) -> str:
+    def get_vacant_rooms(self, wkday: int = None) -> list:
         '''Returns vacant rooms for every lesson grouped by floors'''
         week_days = ['Понедельник', 'Вторник', 'Среда', 'Четверг',
                      'Пятница', 'Суббота']
@@ -509,13 +492,13 @@ class DataGatherer:
 
             vacant_rooms.append(grouped)
 
-        return self.json.encode(vacant_rooms)
+        return vacant_rooms
 
-    def get_class_teachers(self) -> str:
+    def get_class_teachers(self) -> dict:
         '''Returns teachers' abbreviated names for each class
         with their subject'''
         class_teachers = {}
-        for cls in self.get_class_list(return_json=False):
+        for cls in self.get_class_list(group=False):
             teachers = []
             used_subjects = set()
             tmtbl = self.get_perm_timetable(cls)
@@ -537,4 +520,4 @@ class DataGatherer:
 
             class_teachers[cls] = teachers
 
-        return self.json.encode(class_teachers)
+        return class_teachers

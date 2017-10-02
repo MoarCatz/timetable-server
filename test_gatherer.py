@@ -88,9 +88,9 @@ class TestDataGatherer(unittest.TestCase):
 
         with HTTMock(mock_class_list):
             self.assertListEqual(act_classes,
-                                 gth.get_class_list(return_json=False))
+                                 gth.get_class_list(group=False))
             self.assertDictEqual(act_classes_grouped,
-                                 json.loads(gth.get_class_list()))
+                                 gth.get_class_list())
 
     def test_study_plan(self):
         gth = DataGatherer()
@@ -101,7 +101,7 @@ class TestDataGatherer(unittest.TestCase):
 
         with HTTMock(mock_study_plan):
             self.assertListEqual(act_december,
-                                 json.loads(gth.get_study_plan())[3])
+                                 gth.get_study_plan()[3])
 
     def test_rings_timetable(self):
         gth = DataGatherer()
@@ -121,7 +121,7 @@ class TestDataGatherer(unittest.TestCase):
 
         with HTTMock(mock_rings_timetable):
             self.assertListEqual(act_rings,
-                                 json.loads(gth.get_rings_timetable()))
+                                 gth.get_rings_timetable())
 
     def test_perm_timetable(self):
         gth = DataGatherer()
@@ -140,7 +140,7 @@ class TestDataGatherer(unittest.TestCase):
 
         pass_cls = '8А'
         with HTTMock(mock_class_list, mock_perm_timetable):
-            full_tmtbl = json.loads(gth.get_full_perm_timetable())
+            full_tmtbl = gth.get_full_perm_timetable()
 
         for cls in full_tmtbl:
             if cls == pass_cls:
@@ -176,7 +176,7 @@ class TestDataGatherer(unittest.TestCase):
         with HTTMock(mock_teacher_list,
                      mock_teacher_timetable2,
                      mock_teacher_data):
-            teachers = json.loads(gth.get_teachers())
+            teachers = gth.get_teachers()
             for teacher in teachers:
                 for i in act_teachers:
                     if teacher['full'] == i['full']:
@@ -195,7 +195,7 @@ class TestDataGatherer(unittest.TestCase):
 
         with HTTMock(mock_changes):
             self.assertListEqual(act_changes,
-                                 json.loads(gth.get_changes()))
+                                 gth.get_changes())
 
     def test_vacant_rooms(self):
         gth = DataGatherer()
@@ -203,7 +203,7 @@ class TestDataGatherer(unittest.TestCase):
             act_vacant_rooms = json.load(f)
 
         with HTTMock(mock_all_rooms, mock_room_occupation):
-            vacant_rooms = json.loads(gth.get_vacant_rooms(wkday=6))
+            vacant_rooms = gth.get_vacant_rooms(wkday=6)
             for vacant, act_vacant in zip(vacant_rooms,
                                           act_vacant_rooms):
                 for key in vacant:
@@ -226,7 +226,7 @@ class TestDataGatherer(unittest.TestCase):
                                       'subject': 'Литература'}]}
 
         with HTTMock(mock_class_list, mock_perm_timetable):
-            class_teachers = json.loads(gth.get_class_teachers())
+            class_teachers = gth.get_class_teachers()
             for cls in class_teachers:
                 self.assertCountEqual(class_teachers[cls],
                                       act_class_teachers[cls])
