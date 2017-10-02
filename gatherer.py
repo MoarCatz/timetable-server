@@ -313,14 +313,17 @@ class DataGatherer:
 
         for idx, day in enumerate(week):
             lessons = day['Lessons']
+            day_tmtbl = timetable[idx]
             for lesson in lessons:
+                for i in range(int(lesson['Number']) - len(day_tmtbl) - 1):
+                    day_tmtbl.append([])
                 form_lsns = []
                 for group in lesson['LessonsByGroups']:
                     form_lsns.append({'name': group['Subject'],
                                       'teacher': group['Teacher'],
                                       'room': group['Classroom']})
 
-                timetable[idx].append(form_lsns)
+                day_tmtbl.append(form_lsns)
 
         return timetable
 
@@ -521,5 +524,3 @@ class DataGatherer:
             class_teachers[cls] = teachers
 
         return class_teachers
-
-print(DataGatherer().get_study_plan())
