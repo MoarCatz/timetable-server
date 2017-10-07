@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Tuple
 from urllib.parse import urlencode, quote_plus
 import json
+import logging
 import os
 import re
 import odf.opendocument
@@ -9,6 +10,14 @@ import odf.table
 import odf.style
 import requests
 
+
+log_fmt = logging.Formatter('[{asctime}] [{levelname}] [{name}]\n{message}\n',
+                            datefmt='%d-%m %H:%M:%S',
+                            style='{')
+
+cns_log = logging.StreamHandler()
+cns_log.setLevel(logging.DEBUG)
+cns_log.setFormatter(log_fmt)
 
 class Day:
     '''Represents a day in the calendar'''
@@ -221,12 +230,19 @@ class ODTParser:
 
 class DataGatherer:
     '''Class to collect data that is relevant to the application'''
+    bad_get = '{}: unsuccessful fetch ({})'
 
-    @staticmethod
-    def api_url(**kwargs) -> str:
+    def __init__(self):
+        self.log = logging.Logger('DataGatherer')
+        self.log.setLevel(logging.DEBUG)
+        self.log.addHandler(cns_log)
+
+    def api_url(self, **kwargs) -> str:
         '''Returns a properly formed and encoded URL for the SESC API'''
         api_base = 'http://lyceum.urfu.ru/study/mobile.php?'
-        return api_base + urlencode(kwargs, encoding='cp1251')
+        url = api_base + urlencode(kwargs, encoding='cp1251')
+        self.log.debug('assembled URL is "{}"'.format(url))
+        return url
 
     def get_class_list(self, group=True) -> dict:
         '''Gets the list of classes grouped by form
@@ -235,6 +251,8 @@ class DataGatherer:
         url = self.api_url(f=4)
         resp = requests.get(url)
         if resp.status_code != 200:
+            self.log.error(self.bad_get.format(('class_list',
+                                                resp.status_code)))
             return None
 
         cls_list = resp.text.upper().splitlines()
@@ -258,6 +276,8 @@ class DataGatherer:
         filename = 'study_plan.odt'
         resp = requests.get(url)
         if resp.status_code != 200:
+            self.log.error(self.bad_get.format(('study_plan',
+                                                resp.status_code)))
             return None
 
         with open(filename, 'wb') as file:
@@ -277,6 +297,8 @@ class DataGatherer:
         url = 'http://lyceum.urfu.ru/study/?id=0'
         resp = requests.get(url)
         if resp.status_code != 200:
+            self.log.error(self.bad_get.format(('rings_timetable',
+                                                resp.status_code)))
             return None
 
         lessons = ptn.findall(resp.text)
@@ -304,11 +326,15 @@ class DataGatherer:
         url = self.api_url(f=1, k=cls.lower())
         resp = requests.get(url)
         if resp.status_code != 200:
+            self.log.error(self.bad_get.format(('perm_timetable',
+                                                resp.status_code)))
             return None
 
         try:
             week = json.loads(resp.text)[cls.lower()]['Timetable']
         except json.decoder.JSONDecodeError:
+            self.log.error('failed to decode response')
+            self.log.debug(resp.text)
             return None
 
         for idx, day in enumerate(week):
@@ -330,6 +356,8 @@ class DataGatherer:
     def get_full_perm_timetable(self) -> dict:
         '''Returns the permanent timetable for all classes'''
         cls_list = self.get_class_list(group=False)
+        if cls_list is None:
+            return None
 
         full_tmtb = {cls: self.get_perm_timetable(cls) for cls in cls_list}
 
@@ -343,11 +371,15 @@ class DataGatherer:
         url = self.api_url(f=2, p=abbr_name)
         resp = requests.get(url)
         if resp.status_code != 200:
+            self.log.error(self.bad_get.format(('teacher_timetable',
+                                                resp.status_code)))
             return None
 
         try:
             week = json.loads(resp.text)[abbr_name]['Timetable']
         except json.decoder.JSONDecodeError:
+            self.log.error('failed to decode response')
+            self.log.debug(resp.text)
             return None, None
 
         timetable = [None] * 6
@@ -370,7 +402,7 @@ class DataGatherer:
             if any(lessons):
                 timetable[day_number] = lessons
 
-        return timetable, list(classes)
+        return timetable, sorted(classes)
 
     def get_teachers(self) -> list:
         '''Returns full information about every teacher'''
@@ -384,6 +416,8 @@ class DataGatherer:
         url = self.api_url(f=7)
         resp = requests.get(url)
         if resp.status_code != 200:
+            self.log.error(self.bad_get.format(('teachers',
+                                                resp.status_code)))
             return None
 
         tch_list = resp.text.splitlines()
@@ -396,6 +430,12 @@ class DataGatherer:
             abbr_name = last + ' {}. {}.'.format(first[0], patr[0])
             tch_obj['abbr'] = abbr_name
 
+            # Collect timetable
+            tmtbl, classes = self.get_teacher_timetable(abbr_name)
+            if tmtbl is not None:
+                tch_obj['timetable'] = tmtbl
+                tch_obj['classes'] = classes
+
             # Collect job and department
             req_data = {'subStaff': '%C8%F1%EA%E0%F2%FC',  # "Искать"
                         'unitStaff': '0',
@@ -406,17 +446,16 @@ class DataGatherer:
                                  data=data_str,
                                  headers=headers)
 
-            for match in info_ptn.findall(resp.text.replace('&nbsp;', ' ')):
-                if full_name == match[0]:
-                    tch_obj['dep'] = match[1]
-                    tch_obj['job'] = match[2]
-                    break
-
-            # Collect timetable
-            tmtbl, classes = self.get_teacher_timetable(abbr_name)
-            if tmtbl is not None:
-                tch_obj['timetable'] = tmtbl
-                tch_obj['classes'] = classes
+            if resp.status_code != 200:
+                self.log.error(self.bad_get.format(('teacher_data',
+                                                    resp.status_code)))
+            else:
+                clean = resp.text.replace('&nbsp;', ' ')
+                for match in info_ptn.findall(clean):
+                    if full_name == match[0]:
+                        tch_obj['dep'] = match[1]
+                        tch_obj['job'] = match[2]
+                        break
 
             teachers.append(tch_obj)
 
@@ -442,6 +481,8 @@ class DataGatherer:
 
         resp = requests.get(url)
         if resp.status_code != 200:
+            self.log.error(self.bad_get.format(('changes',
+                                                resp.status_code)))
             return None
 
         days = []
@@ -468,19 +509,26 @@ class DataGatherer:
         room_list_url = self.api_url(f=6)
         resp = requests.get(room_list_url)
         if resp.status_code != 200:
+            self.log.error(self.bad_get.format(('room_list',
+                                                resp.status_code)))
             return None
 
         room_list = {i for i in resp.text.splitlines() if i.isdigit()}
 
         wkday_idx = wkday or datetime.now().isoweekday()
+        self.log.info('selected weekday: {}'.format(wkday_idx))
         occ_rooms_url = self.api_url(f=3, d=wkday_idx)
         resp = requests.get(occ_rooms_url)
         if resp.status_code != 200:
+            self.log.error(self.bad_get.format(('vacant_rooms',
+                                                resp.status_code)))
             return None
 
         try:
             lsns = json.loads(resp.text)[week_days[wkday_idx - 1]]['Timetable']
         except json.decoder.JSONDecodeError:
+            self.log.error('failed to decode response')
+            self.log.debug(resp.text)
             return None
 
         occ_rooms = []
@@ -506,6 +554,7 @@ class DataGatherer:
             used_subjects = set()
             tmtbl = self.get_perm_timetable(cls)
             if tmtbl is None:
+                self.log.error('failed to collect the timetable for ' + cls)
                 continue
 
             for day in tmtbl:
