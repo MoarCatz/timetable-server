@@ -4,11 +4,13 @@ python:
   - "3.5"
 
 install:
-  - pip install codecov coverage httmock requests odfpy
+  - pip install codecov coverage httmock requests odfpy psycopg2
 
 script:
   - python3 test_gatherer.py
+  - python3 test_diff_computer.py
   - coverage run test_gatherer.py
+  - coverage run test_diff_computer.py
 
 after_success:
   - codecov
