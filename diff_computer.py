@@ -93,10 +93,17 @@ class DiffComputer:
                 continue
 
             for field in ('full', 'dep', 'job', 'classes'):
-                if new_tchr[field] == teacher[field]:
-                    new_tchr[field] = None
-
-            new_tchr['timetable'] = self.diff_timetable(old, new)
+                try:
+                    if new_tchr[field] == teacher[field]:
+                        new_tchr[field] = None
+                except KeyError:
+                    pass
+            try:
+                new_tchr['timetable'] = self.diff_timetable(
+                    teacher['timetable'],
+                    new_tchr['timetable'])
+            except KeyError:
+                pass
 
         return self.json.encode(new)
 
