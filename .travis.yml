@@ -9,8 +9,9 @@ install:
 script:
   - python3 test_gatherer.py
   - python3 test_diff_computer.py
-  - coverage run test_gatherer.py
-  - coverage run test_diff_computer.py
+  - COVERAGE_FILE=.coverage_gth coverage run test_gatherer.py
+  - COVERAGE_FILE=.coverage_diff coverage run test_diff_computer.py
+  - coverage combine .coverage_gth .coverage_diff
 
 after_success:
   - codecov
