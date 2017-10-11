@@ -179,5 +179,3 @@ class TestDiffComputer(unittest.TestCase):
         diff2 = self.comp.diff_class_teachers(tchrs)
         self.assertDictEqual(json.loads(diff2),
                              tchrs)
-
-unittest.main()

@@ -232,10 +232,13 @@ class DataGatherer:
     '''Class to collect data that is relevant to the application'''
     bad_get = '{}: unsuccessful fetch ({})'
 
-    def __init__(self):
+    def __init__(self, silent: bool = False):
         self.log = logging.Logger('DataGatherer')
-        self.log.setLevel(logging.DEBUG)
-        self.log.addHandler(cns_log)
+        if not silent:
+            self.log.addHandler(cns_log)
+            self.log.setLevel(logging.DEBUG)
+        else:
+            self.log.setLevel(logging.CRITICAL)
 
     def api_url(self, **kwargs) -> str:
         '''Returns a properly formed and encoded URL for the SESC API'''
