@@ -84,7 +84,7 @@ class DiffComputer:
         if old is None:
             return self.json.encode(new)
 
-        name_lookup = {i['abbr']: i for i in new}
+        name_lookup = {i['abbr']: i for i in new if 'abbr' in i}
 
         for teacher in old:
             try:

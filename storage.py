@@ -22,7 +22,7 @@ class Storage:
         c.execute('''SELECT value FROM storage WHERE key = %s''', (key,))
         try:
             value = c.fetchone()[0]
-        except IndexError:
+        except TypeError:
             raise KeyError('no value with this key: {}'.format(key))
         c.close()
         return value

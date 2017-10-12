@@ -114,7 +114,9 @@ class TestDiffComputer(unittest.TestCase):
                   'full': 'Teacher 1',
                   'job': 'teacher',
                   'timetable': [],
-                  'classes': []}]
+                  'classes': []},
+                 {'abbr': 't2'},
+                 {'abbr': 't3'}]
 
         diff1 = self.comp.diff_teachers(tchrs)
         self.assertListEqual(json.loads(diff1),
@@ -124,7 +126,8 @@ class TestDiffComputer(unittest.TestCase):
                    'job': 'teacher',
                    'timetable': [],
                    'classes': []},
-                  {'abbr': 't2'}]
+                  {'abbr': 't2'},
+                  {'job': 'test_wrecker'}]
         diff2 = self.comp.diff_teachers(tchrs2)
         tchrs[0]['job'] = None
         self.assertListEqual(json.loads(diff2),
@@ -132,7 +135,8 @@ class TestDiffComputer(unittest.TestCase):
                                'job': None,
                                'timetable': [],
                                'classes': None},
-                              {'abbr': 't2'}])
+                              {'abbr': 't2'},
+                              {'job': 'test_wrecker'}])
 
     def test_changes(self):
         self.storage['changes'] = 'null'

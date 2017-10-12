@@ -45,6 +45,9 @@ class TestStorage(unittest.TestCase):
         self.assertEqual(self.storage['getkey'],
                          '["value"]')
 
+        with self.assertRaises(KeyError):
+            self.storage.get('non-existent')
+
     def test_set(self):
         c = self.db.cursor()
 

@@ -123,10 +123,10 @@ class TestDataGatherer(unittest.TestCase):
                      {'start': '11:40', 'end': '12:20', 'type': 'lesson'},
                      {'len': 15, 'type': 'break'},
                      {'start': '12:35', 'end': '13:15', 'type': 'lesson'},
-                     {'len': 20, 'type': 'break'},
-                     {'start': '13:35', 'end': '14:15', 'type': 'lesson'},
-                     {'len': 20, 'type': 'break'},
-                     {'start': '14:35', 'end': '15:15', 'type': 'lesson'}]
+                     {'len': 0, 'type': 'break'},
+                     {'start': '13:15', 'end': '13:59', 'type': 'lesson'},
+                     {'len': 16, 'type': 'break'},
+                     {'start': '14:15', 'end': '15:15', 'type': 'lesson'}]
 
         with HTTMock(mock_rings_timetable):
             self.assertListEqual(act_rings,
