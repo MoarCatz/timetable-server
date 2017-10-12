@@ -1,9 +1,14 @@
 import unittest
 from urllib.parse import urlencode, quote_plus
 import json
-from httmock import HTTMock, urlmatch
+from httmock import HTTMock, urlmatch, all_requests
 from gatherer import DataGatherer
 
+
+@all_requests
+def mock_failure(url, req):
+    return {'status_code': 500,
+	        'content': ''}
 
 @urlmatch(query='f=4')
 def mock_class_list(url, req):
@@ -93,6 +98,9 @@ class TestDataGatherer(unittest.TestCase):
             self.assertDictEqual(act_classes_grouped,
                                  self.gth.get_class_list())
 
+        with HTTMock(mock_failure):
+            self.assertIsNone(self.gth.get_class_list())
+
     def test_study_plan(self):
         # December is the most eventful month, according to the 2017-18 data
         with open('__tests__/test_files/december.json') as dec:
@@ -101,6 +109,9 @@ class TestDataGatherer(unittest.TestCase):
         with HTTMock(mock_study_plan):
             self.assertListEqual(act_december,
                                  self.gth.get_study_plan()[3])
+
+        with HTTMock(mock_failure):
+            self.assertIsNone(self.gth.get_study_plan())
 
     def test_rings_timetable(self):
         act_rings = [{'start': '9:00', 'end': '9:40', 'type': 'lesson'},
@@ -121,6 +132,9 @@ class TestDataGatherer(unittest.TestCase):
             self.assertListEqual(act_rings,
                                  self.gth.get_rings_timetable())
 
+        with HTTMock(mock_failure):
+            self.assertIsNone(self.gth.get_rings_timetable())
+
     def test_perm_timetable(self):
         with open('__tests__/test_files/act_perm_timetable.json') as f:
             act_timetable = json.load(f)
@@ -129,6 +143,9 @@ class TestDataGatherer(unittest.TestCase):
             self.assertListEqual(act_timetable,
                                  self.gth.get_perm_timetable('8а'))
             self.assertIsNone(self.gth.get_perm_timetable('8б'))
+
+        with HTTMock(mock_failure):
+            self.assertIsNone(self.gth.get_perm_timetable('8а'))
 
     def test_full_perm_timetable(self):
         with open('__tests__/test_files/act_perm_timetable.json') as f:
@@ -148,6 +165,9 @@ class TestDataGatherer(unittest.TestCase):
         self.assertSetEqual({'8А', '9Б', '10Я', '11О', '10П'},
                             set(full_tmtbl))
 
+        with HTTMock(mock_failure):
+            self.assertIsNone(self.gth.get_full_perm_timetable())
+
     def test_teacher_timetable(self):
         with open('__tests__/test_files/act_teacher_timetable.json') as f:
             act_timetable = json.load(f)
@@ -162,6 +182,9 @@ class TestDataGatherer(unittest.TestCase):
                             set(classes))
         self.assertIsNone(tmtbl1)
         self.assertIsNone(classes1)
+
+        with HTTMock(mock_failure):
+            self.assertIsNone(self.gth.get_teacher_timetable('Нет Т. У.'))
 
     def test_teachers(self):
         with open('__tests__/test_files/act_teachers.json') as f:
@@ -182,6 +205,9 @@ class TestDataGatherer(unittest.TestCase):
                 self.assertDictEqual(act_tchr,
                                      teacher)
 
+        with HTTMock(mock_failure):
+            self.assertIsNone(self.gth.get_teachers())
+
     def test_changes(self):
         with open('__tests__/test_files/act_changes.json') as f:
             act_changes = json.load(f)
@@ -189,6 +215,9 @@ class TestDataGatherer(unittest.TestCase):
         with HTTMock(mock_changes):
             self.assertListEqual(act_changes,
                                  self.gth.get_changes())
+
+        with HTTMock(mock_failure):
+            self.assertIsNone(self.gth.get_changes())
 
     def test_vacant_rooms(self):
         with open('__tests__/test_files/act_vacant_rooms.json') as f:
@@ -203,6 +232,9 @@ class TestDataGatherer(unittest.TestCase):
                                           act_vacant[key])
 
                 self.assertCountEqual(vacant.keys(), act_vacant.keys())
+
+        with HTTMock(mock_failure):
+            self.assertIsNone(self.gth.get_vacant_rooms())
 
     def test_class_teachers(self):
         act_class_teachers = {'8А': [{'teacher': 'Учитель П. И.',
@@ -221,3 +253,6 @@ class TestDataGatherer(unittest.TestCase):
             for cls in class_teachers:
                 self.assertCountEqual(class_teachers[cls],
                                       act_class_teachers[cls])
+
+        with HTTMock(mock_failure):
+            self.assertIsNone(self.gth.get_class_teachers())

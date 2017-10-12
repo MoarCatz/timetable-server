@@ -254,8 +254,8 @@ class DataGatherer:
         url = self.api_url(f=4)
         resp = requests.get(url)
         if resp.status_code != 200:
-            self.log.error(self.bad_get.format(('class_list',
-                                                resp.status_code)))
+            self.log.error(self.bad_get.format('class_list',
+                                               resp.status_code))
             return None
 
         cls_list = resp.text.upper().splitlines()
@@ -279,8 +279,8 @@ class DataGatherer:
         filename = 'study_plan.odt'
         resp = requests.get(url)
         if resp.status_code != 200:
-            self.log.error(self.bad_get.format(('study_plan',
-                                                resp.status_code)))
+            self.log.error(self.bad_get.format('study_plan',
+                                               resp.status_code))
             return None
 
         with open(filename, 'wb') as file:
@@ -300,8 +300,8 @@ class DataGatherer:
         url = 'http://lyceum.urfu.ru/study/?id=0'
         resp = requests.get(url)
         if resp.status_code != 200:
-            self.log.error(self.bad_get.format(('rings_timetable',
-                                                resp.status_code)))
+            self.log.error(self.bad_get.format('rings_timetable',
+                                               resp.status_code))
             return None
 
         lessons = ptn.findall(resp.text)
@@ -329,8 +329,8 @@ class DataGatherer:
         url = self.api_url(f=1, k=cls.lower())
         resp = requests.get(url)
         if resp.status_code != 200:
-            self.log.error(self.bad_get.format(('perm_timetable',
-                                                resp.status_code)))
+            self.log.error(self.bad_get.format('perm_timetable',
+                                               resp.status_code))
             return None
 
         try:
@@ -374,8 +374,8 @@ class DataGatherer:
         url = self.api_url(f=2, p=abbr_name)
         resp = requests.get(url)
         if resp.status_code != 200:
-            self.log.error(self.bad_get.format(('teacher_timetable',
-                                                resp.status_code)))
+            self.log.error(self.bad_get.format('teacher_timetable',
+                                               resp.status_code))
             return None
 
         try:
@@ -419,8 +419,8 @@ class DataGatherer:
         url = self.api_url(f=7)
         resp = requests.get(url)
         if resp.status_code != 200:
-            self.log.error(self.bad_get.format(('teachers',
-                                                resp.status_code)))
+            self.log.error(self.bad_get.format('teachers',
+                                               resp.status_code))
             return None
 
         tch_list = resp.text.splitlines()
@@ -450,8 +450,8 @@ class DataGatherer:
                                  headers=headers)
 
             if resp.status_code != 200:
-                self.log.error(self.bad_get.format(('teacher_data',
-                                                    resp.status_code)))
+                self.log.error(self.bad_get.format('teacher_data',
+                                                   resp.status_code))
             else:
                 clean = resp.text.replace('&nbsp;', ' ')
                 for match in info_ptn.findall(clean):
@@ -484,8 +484,8 @@ class DataGatherer:
 
         resp = requests.get(url)
         if resp.status_code != 200:
-            self.log.error(self.bad_get.format(('changes',
-                                                resp.status_code)))
+            self.log.error(self.bad_get.format('changes',
+                                               resp.status_code))
             return None
 
         days = []
@@ -512,8 +512,8 @@ class DataGatherer:
         room_list_url = self.api_url(f=6)
         resp = requests.get(room_list_url)
         if resp.status_code != 200:
-            self.log.error(self.bad_get.format(('room_list',
-                                                resp.status_code)))
+            self.log.error(self.bad_get.format('room_list',
+                                               resp.status_code))
             return None
 
         room_list = {i for i in resp.text.splitlines() if i.isdigit()}
@@ -523,8 +523,8 @@ class DataGatherer:
         occ_rooms_url = self.api_url(f=3, d=wkday_idx)
         resp = requests.get(occ_rooms_url)
         if resp.status_code != 200:
-            self.log.error(self.bad_get.format(('vacant_rooms',
-                                                resp.status_code)))
+            self.log.error(self.bad_get.format('vacant_rooms',
+                                               resp.status_code))
             return None
 
         try:
@@ -552,7 +552,12 @@ class DataGatherer:
         '''Returns teachers' abbreviated names for each class
         with their subject'''
         class_teachers = {}
-        for cls in self.get_class_list(group=False):
+
+        cls_list = self.get_class_list(group=False)
+        if cls_list is None:
+            return None
+
+        for cls in cls_list:
             teachers = []
             used_subjects = set()
             tmtbl = self.get_perm_timetable(cls)

@@ -30,13 +30,13 @@ class Storage:
     def set(self, key: str, value: str):
         '''Sets the given key to the given value'''
         c = self.db.cursor()
-        c.execute('''SELECT FROM storage WHERE key = %s''', (key,))
+        c.execute('''SELECT value FROM storage WHERE key = %s''', (key,))
         if c.fetchone() is None:
             c.execute('''INSERT INTO storage
                          VALUES (%s, %s)''', (key, str(value)))
         else:
             c.execute('''UPDATE storage SET value = %s
-                         WHERE key = %s''', (key, str(value)))
+                         WHERE key = %s''', (str(value), key))
         self.db.commit()
         c.close()
 
