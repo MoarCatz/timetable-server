@@ -20,9 +20,3 @@ after_success:
 
 notifications:
   email: false
-
-  slack:
-    rooms:
-      - owllit:GRN6KTTcUiujsRDPbBROMEr0
-    on_success: never
-    on_failure: always
