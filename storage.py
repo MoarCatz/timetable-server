@@ -19,7 +19,7 @@ class Storage:
     def get(self, key: str) -> str:
         '''Returns a value by key given as a string'''
         c = self.db.cursor()
-        c.execute('''SELECT FROM storage WHERE key = %s''', (key,))
+        c.execute('''SELECT value FROM storage WHERE key = %s''', (key,))
         try:
             value = c.fetchone()[0]
         except IndexError:
@@ -32,10 +32,11 @@ class Storage:
         c = self.db.cursor()
         c.execute('''SELECT FROM storage WHERE key = %s''', (key,))
         if c.fetchone() is None:
-            c.execute('''INSERT INTO storage VALUES (%s, %s)''', (key, value))
+            c.execute('''INSERT INTO storage
+                         VALUES (%s, %s)''', (key, str(value)))
         else:
             c.execute('''UPDATE storage SET value = %s
-                         WHERE key = %s''', (key, value))
+                         WHERE key = %s''', (key, str(value)))
         self.db.commit()
         c.close()
 
@@ -44,3 +45,7 @@ class Storage:
 
     def __setitem__(self, key: str, value: str):
         self.set(key, value)
+
+    def close(self):
+        '''Closes the database connection'''
+        self.db.close()
