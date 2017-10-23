@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Tuple
 from urllib.parse import urlencode, quote_plus
 import json
@@ -23,8 +22,8 @@ class Day:
     '''Represents a day in the calendar'''
 
     def __init__(self, day_num: int,
-                       is_wknd: bool = False,
-                       day_type: str = None):
+                 is_wknd: bool = False,
+                 day_type: str = None):
         '''Initializes self. Requires the day number.
         Optional parameters include marking the day as a weekend and
         specifying the cell type'''
@@ -505,10 +504,11 @@ class DataGatherer:
 
         return days
 
-    def get_vacant_rooms(self, wkday: int = None) -> list:
-        '''Returns vacant rooms for every lesson grouped by floors'''
-        week_days = ['Понедельник', 'Вторник', 'Среда', 'Четверг',
-                     'Пятница', 'Суббота']
+    def get_vacant_rooms(self) -> list:
+        '''Returns vacant rooms for every lesson for every weekday
+        grouped by floors'''
+        weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг',
+                    'Пятница', 'Суббота']
         room_list_url = self.api_url(f=6)
         resp = requests.get(room_list_url)
         if resp.status_code != 200:
@@ -518,33 +518,35 @@ class DataGatherer:
 
         room_list = {i for i in resp.text.splitlines() if i.isdigit()}
 
-        wkday_idx = wkday or datetime.now().isoweekday()
-        self.log.info('selected weekday: {}'.format(wkday_idx))
-        occ_rooms_url = self.api_url(f=3, d=wkday_idx)
-        resp = requests.get(occ_rooms_url)
-        if resp.status_code != 200:
-            self.log.error(self.bad_get.format('vacant_rooms',
-                                               resp.status_code))
-            return None
-
-        try:
-            lsns = json.loads(resp.text)[week_days[wkday_idx - 1]]['Timetable']
-        except json.decoder.JSONDecodeError:
-            self.log.error('failed to decode response')
-            self.log.debug(resp.text)
-            return None
-
-        occ_rooms = []
-        for lesson in lsns:
-            occ_rooms.append({i['Classroom'] for i in lesson['Classrooms']})
-
         vacant_rooms = []
-        for lesson_rooms in occ_rooms:
-            grouped = {'1': [], '2': [], '3': []}
-            for i in room_list.difference(lesson_rooms):
-                grouped[i[0]].append(i)
+        for wkday_idx in range(1, 7):
+            occ_rooms_url = self.api_url(f=3, d=wkday_idx)
+            resp = requests.get(occ_rooms_url)
+            if resp.status_code != 200:
+                self.log.error(self.bad_get.format('vacant_rooms',
+                                                   resp.status_code))
+                return None
 
-            vacant_rooms.append(grouped)
+            try:
+                wkday = weekdays[wkday_idx - 1]
+                lsns = json.loads(resp.text)[wkday]['Timetable']
+            except json.decoder.JSONDecodeError:
+                self.log.error('failed to decode response')
+                self.log.debug(resp.text)
+                return None
+
+            occ_rooms = []
+            for lsn in lsns:
+                occ_rooms.append({i['Classroom'] for i in lsn['Classrooms']})
+
+            curr_day = []
+            for lesson_rooms in occ_rooms:
+                grouped = {'1': [], '2': [], '3': []}
+                for i in room_list.difference(lesson_rooms):
+                    grouped[i[0]].append(i)
+
+                curr_day.append(grouped)
+            vacant_rooms.append(curr_day)
 
         return vacant_rooms
 

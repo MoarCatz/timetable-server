@@ -107,6 +107,18 @@ class DiffComputer:
 
         return self.json.encode(new)
 
+    def diff_vacant_rooms(self, new: list) -> str:
+        old = self.exchange('vacant_rooms', new)
+        if old is None:
+            return self.json.encode(new)
+
+        for day_idx, old_day in enumerate(old):
+            for floor, rooms in old_day:
+                if new[day_idx][floor] == rooms:
+                    new[day_idx][floor] = None
+
+        return self.json.encode(new)
+
     def diff_changes(self, new: list) -> str:
         old = self.exchange('changes', new)
         if old is None:

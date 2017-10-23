@@ -1,6 +1,7 @@
 import unittest
 from urllib.parse import urlencode, quote_plus
 import json
+import re
 from httmock import HTTMock, urlmatch, all_requests
 from gatherer import DataGatherer
 
@@ -8,7 +9,7 @@ from gatherer import DataGatherer
 @all_requests
 def mock_failure(url, req):
     return {'status_code': 500,
-	        'content': ''}
+            'content': ''}
 
 @urlmatch(query='f=4')
 def mock_class_list(url, req):
@@ -78,8 +79,11 @@ def mock_all_rooms(url, req):
 
 @urlmatch(query='.*f=3.*')
 def mock_room_occupation(url, req):
+    weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг',
+                'Пятница', 'Суббота']
+    idx = int(re.search('d=([1-6])', url.query).group(1))
     with open('__tests__/test_files/room_occupation.json') as f:
-        return f.read()
+        return f.read().replace('wkday', weekdays[idx - 1])
 
 class TestDataGatherer(unittest.TestCase):
     def setUp(self):
@@ -224,14 +228,14 @@ class TestDataGatherer(unittest.TestCase):
             act_vacant_rooms = json.load(f)
 
         with HTTMock(mock_all_rooms, mock_room_occupation):
-            vacant_rooms = self.gth.get_vacant_rooms(wkday=6)
-            for vacant, act_vacant in zip(vacant_rooms,
-                                          act_vacant_rooms):
-                for key in vacant:
-                    self.assertCountEqual(vacant[key],
-                                          act_vacant[key])
+            vacant_rooms = self.gth.get_vacant_rooms()
+            for day, act_day in zip(vacant_rooms, act_vacant_rooms):
+                for vacant, act_vacant in zip(day, act_day):
+                    for key in vacant:
+                        self.assertCountEqual(vacant[key],
+                                              act_vacant[key])
 
-                self.assertCountEqual(vacant.keys(), act_vacant.keys())
+                    self.assertCountEqual(vacant.keys(), act_vacant.keys())
 
         with HTTMock(mock_failure):
             self.assertIsNone(self.gth.get_vacant_rooms())
