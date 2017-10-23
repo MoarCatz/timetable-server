@@ -138,6 +138,21 @@ class TestDiffComputer(unittest.TestCase):
                               {'abbr': 't2'},
                               {'job': 'test_wrecker'}])
 
+    def test_vacant_rooms(self):
+        self.storage['vacant_rooms'] = 'null'
+
+        vacant = [[{'1': ['101', '102']}, {}, {}, {}, {}], [], [], [], [], []]
+        diff1 = self.comp.diff_vacant_rooms(vacant)
+        self.assertListEqual(json.loads(diff1),
+                             vacant)
+
+        vacant1 = [[{'1': ['101', '102'],
+                     '2': ['201']}, {}, {}, {}, {}], [], [], [], [], []]
+        diff2 = self.comp.diff_vacant_rooms(vacant1)
+        self.assertListEqual(json.loads(diff2),
+                             [[{'1': None, '2': ['201']}, {}, {}, {}, {}],
+                              [], [], [], [], []])
+
     def test_changes(self):
         self.storage['changes'] = 'null'
 

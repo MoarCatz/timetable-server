@@ -113,9 +113,10 @@ class DiffComputer:
             return self.json.encode(new)
 
         for day_idx, old_day in enumerate(old):
-            for floor, rooms in old_day:
-                if new[day_idx][floor] == rooms:
-                    new[day_idx][floor] = None
+            for lsn_idx, lesson in enumerate(old_day):
+                for floor, rooms in lesson.items():
+                    if new[day_idx][lsn_idx][floor] == rooms:
+                        new[day_idx][lsn_idx][floor] = None
 
         return self.json.encode(new)
 
