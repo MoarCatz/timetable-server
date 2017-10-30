@@ -129,7 +129,11 @@ class DiffComputer:
 
         reserved = {'day', 'month', 'wkday'}
         for day in old:
-            new_day = day_lookup[(day['day'], day['month'])]
+            try:
+                new_day = day_lookup[(day['day'], day['month'])]
+            except KeyError:
+                continue
+
             for prop in day:
                 if prop in reserved:
                     continue
